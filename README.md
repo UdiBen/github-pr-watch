@@ -10,6 +10,25 @@ centric rather than comment centric. So the choice is a channel firehose or
 nothing. This takes the third path: poll the notifications API, keep only
 what is yours, post that.
 
+There are two implementations here, and they differ in where they run:
+
+| | reads | runs on | destination |
+|---|---|---|---|
+| **`apps-script/`** *(recommended)* | notification email | Google's timer | channel or DM |
+| `github.pr.watch` | notifications API | your machine | channel |
+
+Prefer the Apps Script one unless you would rather not involve Google. It keeps
+working while your laptop is shut, needs no GitHub token, splits a review into
+one message per comment, and can deliver a direct message. Measured against 60
+days of review traffic, about 16% of comments arrive outside working hours, so
+a poller that only runs while you are at your desk misses roughly one comment
+every other day.
+
+The rest of this file documents the local poller. See
+[`apps-script/README.md`](apps-script/README.md) for the other.
+
+## The local poller
+
 Python 3, standard library only. Authenticates by shelling out to `gh`, so
 it stores no credential of its own.
 
@@ -135,14 +154,6 @@ closes an unbalanced fence rather than leaving one dangling.
   the second group back.
 - **Empty `COMMENTED` reviews.** Skipped — that is the wrapper GitHub puts
   around inline comments, which arrive separately.
-
-## Variant: run it on Google's infrastructure
-
-`apps-script/` holds a Google Apps Script version that reads the notification
-email instead of the API and posts the same Slack messages on a timer. It needs
-no GitHub token, no webhook on a shared repo, no Slack app approval, and no
-machine of your own, so it keeps working while your laptop sleeps. See
-`apps-script/README.md`.
 
 ## Alternative: no script at all
 

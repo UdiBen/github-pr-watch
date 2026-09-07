@@ -47,8 +47,12 @@ with the state verb, which is how it is told apart from a top-level comment
 
 ## Setup
 
-1. **<https://script.google.com>** → New project. Paste `Code.gs` over the
-   default file. Rename the project to something you will recognise.
+1. **Create the project.** Either paste `Code.gs` into a new project at
+   <https://script.google.com>, or, better, use clasp so the running project
+   and this repo cannot drift apart:
+
+       npx @google/clasp create --title "PR comments to Slack" --type standalone
+       npx @google/clasp push
 
 2. **Project Settings → Script Properties**, add:
 
@@ -62,16 +66,26 @@ with the state verb, which is how it is told apart from a top-level comment
 
    | property | value |
    |---|---|
-   | `SLACK_BOT_TOKEN` | a bot token (`xoxb-…`) with the `chat:write` scope |
+   | `SLACK_BOT_TOKEN` | a bot token (`xoxb-…`) with `chat:write` and `im:write` |
    | `SLACK_DM_TO` | your Slack member id, e.g. `U01234567` |
 
-   Add `chat:write` under *OAuth & Permissions → Bot Token Scopes* at
-   <https://api.slack.com/apps>, reinstall the app, and copy the bot token from
-   the top of that page. If a post fails with `channel_not_found`, add
-   `im:write` as well. `ping` sends one test message and reports which
-   transport carried it.
+   Add **both** scopes under *OAuth & Permissions → Bot Token Scopes* at
+   <https://api.slack.com/apps>, then reinstall the app and copy the bot token
+   from the top of that page. `im:write` is not optional: a bot cannot post to
+   a bare user id, so `conversations.open` is called first to open the direct
+   message, and that needs the scope. Reinstalling can issue a new token —
+   check the value still matches afterwards.
 
-3. **Run `run` once, as the live test.** Google will ask you to authorize Gmail
+3. **Run `ping`.** It sends one message and names the transport that carried
+   it: `delivered via DM to D01…`, or `delivered via webhook to https://…` if
+   either DM property is missing. Failures name their cause —
+   `conversations.open: missing_scope` means step 2's scopes did not take.
+
+   Google will ask you to authorize Gmail and external requests here; the
+   "unverified app" warning is expected for a script you wrote yourself —
+   continue via *Advanced*.
+
+4. **Run `run` once, as the live test.** Google will ask you to authorize Gmail
    and external requests; the "unverified app" warning is expected for a script
    you wrote yourself — continue via *Advanced*. It posts whatever real
    notifications fall inside the two-day window, which is the fastest honest
@@ -80,14 +94,17 @@ with the state verb, which is how it is told apart from a top-level comment
    If you would rather not see that backlog, run `seedSeen` instead: it marks
    the same messages as handled without posting.
 
-4. **Run `setup` once.** It installs a one-minute trigger. Anything `run`
-   already posted is recorded, so nothing repeats.
+5. **Run `setup` once.** It installs the trigger at `TRIGGER_MINUTES`. Anything
+   `run` already posted is recorded, so nothing repeats. Run it again after
+   changing the cadence — the trigger lives server-side and a code change alone
+   does not move it.
 
-5. **Check the Executions tab.** You should see `run` firing with
-   `N thread(s), 0 alert(s)` once it is caught up.
+6. **Check the Executions page**, in the left rail. Trigger runs appear there,
+   not in the editor's execution log, and each names its destination:
+   `1 thread(s), 0 alert(s) via DM`.
 
-6. **Retire the poller**, or every comment arrives twice — the two keep
-   separate state and neither knows about the other:
+7. **Retire the poller** if you were running it, or every comment arrives twice
+   — the two keep separate state and neither knows about the other:
 
        launchctl unload ~/Library/LaunchAgents/dev.udiben.github-pr-watch.plist
 
@@ -104,6 +121,13 @@ doubt.
     # thereafter, from this directory
     npx @google/clasp pull    # what is actually running
     npx @google/clasp push    # deploy this repo
+
+**`clasp push` does not refresh an editor tab you already have open.** The tab
+keeps serving a cached copy, so the function picker will still list functions
+you deleted and will not list new ones. Hard-reload it. Worse, saving from a
+stale tab overwrites the deployed version with the old buffer — so reload
+rather than save if in doubt. Triggers always run the deployed code, never
+whatever a browser is showing.
 
 `.clasp.json` holds the script id and is deliberately untracked, since it points
 at one person's project. `appsscript.json` is the project manifest and is
