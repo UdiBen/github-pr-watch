@@ -1,0 +1,70 @@
+[
+  {
+    "name": "inline review comment, with diff hunk, backticks and a bare number",
+    "cc": "you@example.com, Author <author@noreply.github.com>",
+    "subject": "Re: [acme/widget-service] cache: expire entries on write (PR #12)",
+    "from": "dana-r <notifications@github.com>",
+    "plainBody": "@dana-r commented on this pull request.\n\n\n\n> +\tif errors.Is(err, ErrStale) {\n+\t\treturn err\n+\t}\n\nShould we also handle `cache.ErrLocked` and `store.ErrConflict`? I don't think these are handled, so Evict will return 500?\n\nI think we could return \"409 Conflict\" in those cases, but open to other errors too. \n\n\n\n-- \nReply to this email directly or view it on GitHub:\nhttps://github.com/acme/widget-service/pull/12#pullrequestreview-1001\nYou are receiving this because you authored the thread.\n\nMessage ID: <acme/widget-service/pull/12/review/1001@github.com>",
+    "htmlBody": "<p><b>@dana-r</b> commented on this pull request.</p><hr><p>In <a href=\"https://github.com/x\">internal/cache/cache.go</a>:</p>"
+  },
+  {
+    "name": "approval, no hunk, no file path",
+    "cc": "you@example.com, Author <author@noreply.github.com>",
+    "subject": "Re: [acme/widget-service] cache: expire entries on write (PR #12)",
+    "from": "sam-k <notifications@github.com>",
+    "plainBody": "@sam-k approved this pull request.\n\n\"Nothing major\" means \"all minor\", to be clear :-)\n\n--\nReply to this email directly or view it on GitHub:\nhttps://github.com/acme/widget-service/pull/12#pullrequestreview-1002\nYou are receiving this because you authored the thread.\n\nMessage ID: <acme/widget-service/pull/12/review/1002@github.com>",
+    "htmlBody": "<p><b>@sam-k</b> approved this pull request.</p>"
+  },
+  {
+    "name": "mention on someone else's thread, long body, markdown emphasis",
+    "cc": "you@example.com, Mention <mention@noreply.github.com>",
+    "subject": "Re: [acme/widget-service] docs: ask for a plain-language summary in descriptions (PR #34)",
+    "from": "lee-m <notifications@github.com>",
+    "plainBody": "@lee-m commented on this pull request.\n\n> +* Open with a plain-English summary, before any heading: two short\n+ paragraphs, \"what was broken\" then \"what this does\".\n\nI think the two examples actually agree with each other — and give us a clean split. One style is what-first for the *subject line*, and in a pull request that role is played by the *title*.\n\nSo: title says what it does; description opens problem-first. Does that work for you?\n\n--\nReply to this email directly or view it on GitHub:\nhttps://github.com/acme/widget-service/pull/34#discussion_r2001\nYou are receiving this because you were mentioned.\n\nMessage ID: <acme/widget-service/pull/34/review/2001@github.com>",
+    "htmlBody": "<p><b>@lee-m</b> commented on this pull request.</p><hr><p>In <a href=\"https://github.com/x\">CONTRIBUTING.md</a>:</p>"
+  },
+  {
+    "name": "synthetic: fenced code block, bold, heading, link, HTML comment",
+    "cc": "you@example.com, Author <author@noreply.github.com>",
+    "subject": "Re: [owner/repo] a title (PR #7)",
+    "from": "someone <notifications@github.com>",
+    "plainBody": "@someone commented on this pull request.\n\n<!-- a hidden marker -->\n### Keep it proportionate\n\nThis is **important** and see [the docs](https://example.com/x).\n\n```markdown\n### this heading must stay literal\n- **and so must this**\n```\n\nDone.\n\n--\nReply to this email directly or view it on GitHub:\nhttps://github.com/owner/repo/pull/7#issuecomment-1\nYou are receiving this because you authored the thread.\n\nMessage ID: <owner/repo/pull/7@github.com>",
+    "htmlBody": "<p><b>@someone</b> commented on this pull request.</p>"
+  },
+  {
+    "name": "real inline comment whose CC is state_change@, not author@",
+    "cc": "you@example.com, State Change <state_change@noreply.github.com>",
+    "subject": "Re: [acme/widget-service] store: drain work before close (PR #56)",
+    "from": "kim-t <notifications@github.com>",
+    "plainBody": "@kim-t commented on this pull request.\n\n> +\n+\t_, err := s.Store.Put(ctx, key, value)\n+\trequire.NoError(t, err)\n\nTested the above - the scoped helper works without the extra call, and it can drop the two channels.\nFrom runtime perspective it will reduce 1s.\n\n--\nReply to this email directly or view it on GitHub:\nhttps://github.com/acme/widget-service/pull/56#discussion_r3001\nYou are receiving this because you modified the open/close state.\n\nMessage ID: <acme/widget-service/pull/56/review/3001@github.com>",
+    "htmlBody": "<p><b>@kim-t</b> commented on this pull request.</p><hr><p>In <a href=\"https://github.com/x\">internal/store/store_test.go</a>:</p>"
+  },
+  {
+    "name": "synthetic: merge notice, must not be posted as a comment",
+    "cc": "you@example.com, State Change <state_change@noreply.github.com>",
+    "subject": "Re: [acme/widget-service] store: drain work before close (PR #56)",
+    "from": "sam-k <notifications@github.com>",
+    "plainBody": "Merged #56 into main.\n\n--\nReply to this email directly or view it on GitHub:\nhttps://github.com/acme/widget-service/pull/56#event-1\nYou are receiving this because you modified the open/close state.\n\nMessage ID: <acme/widget-service/pull/56@github.com>",
+    "htmlBody": "<p>Merged <a href=\"https://github.com/x\">#56</a> into main.</p>"
+  },
+  {
+    "name": "same message with CRLF line endings, as Apps Script delivers it",
+    "cc": "you@example.com, State Change <state_change@noreply.github.com>",
+    "subject": "Re: [acme/widget-service] store: drain work before close (PR #56)",
+    "from": "kim-t <notifications@github.com>",
+    "plainBody": "@kim-t commented on this pull request.\r\n\r\n> +\r\n+\t_, err := s.Store.Put(ctx, key, value)\r\n+\trequire.NoError(t, err)\r\n\r\nTested the above - the scoped helper works without the extra call, and it can drop the two channels.\r\nFrom runtime perspective it will reduce 1s.\r\n\r\n-- \r\nReply to this email directly or view it on GitHub:\r\nhttps://github.com/acme/widget-service/pull/56#discussion_r3001\r\nYou are receiving this because you modified the open/close state.\r\n\r\nMessage ID: <acme/widget-service/pull/56/review/3001@github.com>",
+    "htmlBody": "<p><b>@kim-t</b> commented on this pull request.</p><hr><p>In <a href=\"https://github.com/x\">internal/store/store_test.go</a>:</p>"
+  },
+  {
+    "name": "multi-comment review: one email, review body plus three inline notes (CRLF)",
+    "expect": {
+      "messages": 4,
+      "items": 3
+    },
+    "cc": "you@example.com, Author <author@noreply.github.com>",
+    "subject": "Re: [acme/widget-service] store: drain work before close (PR #56)",
+    "from": "sam-k <notifications@github.com>",
+    "plainBody": "@sam-k commented on this pull request.\r\n\r\nThanks!\r\n\r\nApologies for not approving. I hope you were not waiting for that.\r\n\r\nSome comments, nothing major.\r\n\r\n> @@ -358,6 +359,9 @@ func (c *Client) Address(repo, branch, path string) (string, error)\r\n\r\n func (c *Client) Close() error {\r\n \tvar errs error\r\n+\t// Drain background work before closing what it runs on.\r\n+\tc.pool.StopAndWait()\r\n\r\n# :+1:\r\n\r\nGood catch!\r\n\r\n> +// A fold that cancels out entirely must leave the branch clean rather than\r\n+// publish a range that only reproduces the head.\r\n\r\nI cannot see what this can test. There is no functional requirement: the id is a hash of its contents.\r\n\r\nThe only thing it might do is detect that nothing happened. And that's an _implementation_ test.\r\n\r\n> +\r\n+\t_, err := s.Store.Put(ctx, key, value)\r\n+\trequire.NoError(t, err)\r\n+\tbefore, err := s.Manager.Get(ctx, key)\r\n+\trequire.NoError(t, err)\r\n\r\nUggh. I guess that's because leases don't lead to durable locks. Consider opening an issue like\r\n\r\n> ## Leases do not durably lock so the test cannot detect failures\r\n\r\n@kim-t WDYT?\r\n\r\n-- \r\nReply to this email directly or view it on GitHub:\r\nhttps://github.com/acme/widget-service/pull/56#pullrequestreview-4001\r\nYou are receiving this because you authored the thread.\r\n\r\nMessage ID: <acme/widget-service/pull/56/review/4001@github.com>",
+    "htmlBody": "<p><b>@sam-k</b> commented on this pull request.</p><hr><p>In <a href=\"https://github.com/x\">internal/client/client.go</a>:</p><pre>hunk</pre><hr><p>In <a href=\"https://github.com/x\">internal/fold/fold_test.go</a>:</p><pre>hunk</pre><hr><p>In <a href=\"https://github.com/x\">internal/store/store_test.go</a>:</p><pre>hunk</pre>"
+  }
+]

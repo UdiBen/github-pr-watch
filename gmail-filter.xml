@@ -4,8 +4,8 @@
   <id>tag:mail.google.com,2008:filters:github-author-to-slack</id>
   <updated>2026-09-01T00:00:00Z</updated>
   <author>
-    <name>udi</name>
-    <email>udi.benamitai@treeverse.io</email>
+    <name>you</name>
+    <email>you@example.com</email>
   </author>
   <entry>
     <category term='filter'></category>

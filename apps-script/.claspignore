@@ -1,0 +1,5 @@
+**/*.md
+test.js
+fixtures.json
+.clasp.json
+.claspignore

@@ -136,6 +136,14 @@ closes an unbalanced fence rather than leaving one dangling.
 - **Empty `COMMENTED` reviews.** Skipped — that is the wrapper GitHub puts
   around inline comments, which arrive separately.
 
+## Variant: run it on Google's infrastructure
+
+`apps-script/` holds a Google Apps Script version that reads the notification
+email instead of the API and posts the same Slack messages on a timer. It needs
+no GitHub token, no webhook on a shared repo, no Slack app approval, and no
+machine of your own, so it keeps working while your laptop sleeps. See
+`apps-script/README.md`.
+
 ## Alternative: no script at all
 
 GitHub CCs `author@noreply.github.com` on every notification about a thread
