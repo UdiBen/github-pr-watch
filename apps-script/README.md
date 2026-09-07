@@ -120,9 +120,18 @@ live server-side, independent of the files.
 the `cc:mention@noreply.github.com` clause. To widen it, add another reason
 address — `review_requested@`, `assign@`, `team_mention@`.
 
-`everyMinutes()` accepts 1, 5, 10, 15 or 30. One minute costs roughly an hour
-a day against the Apps Script trigger-runtime quota, which is 6 hours a day on
-Workspace and 90 minutes on a personal account. On a personal account use 5.
+`TRIGGER_MINUTES` sets the cadence; `everyMinutes()` accepts 1, 5, 10, 15 or 30.
+Changing it takes effect only when `setup` is run again, because the trigger
+lives server-side and is not part of the code.
+
+Apps Script is not billed, but trigger runtime is capped per day: 6 hours on
+Google Workspace, 90 minutes on a personal account. At one minute this runs
+1,440 times a day, costing roughly 25-50 minutes; at five it costs a fifth of
+that. Exhausting the quota stops the triggers silently for the rest of the day,
+so the Executions page is where that would show.
+
+Note that the pause between posts counts toward runtime: a review producing
+eight messages spends about nine seconds sleeping.
 
 ## Quotas
 

@@ -17,6 +17,11 @@ var PROP_SEEN = 'SEEN_IDS';
 var PROP_LOGIN = 'GITHUB_LOGIN';
 var SEEN_CAP = 400;
 
+// everyMinutes accepts 1, 5, 10, 15 or 30. Five keeps the daily trigger runtime
+// to a few minutes against a six-hour Workspace allowance, and still delivers a
+// comment long before anyone expects a reply.
+var TRIGGER_MINUTES = 5;
+
 /**
  * A notification carries exactly one reason, and it is not always the most
  * specific one: a comment on a pull request you opened arrives CC'd to
@@ -220,14 +225,14 @@ function run() {
     (failed ? ', ' + failed + ' FAILED' : ''));
 }
 
-/** Run once: install the minute trigger. */
+/** Run once, and again after changing TRIGGER_MINUTES: installs the trigger. */
 function setup() {
   var existing = ScriptApp.getProjectTriggers();
   for (var i = 0; i < existing.length; i++) {
     if (existing[i].getHandlerFunction() === 'run') ScriptApp.deleteTrigger(existing[i]);
   }
-  ScriptApp.newTrigger('run').timeBased().everyMinutes(1).create();
-  console.log('trigger installed');
+  ScriptApp.newTrigger('run').timeBased().everyMinutes(TRIGGER_MINUTES).create();
+  console.log('trigger installed, every ' + TRIGGER_MINUTES + ' minute(s)');
 }
 
 /**
