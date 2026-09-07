@@ -1,0 +1,357 @@
+#!/usr/bin/env python3
+"""Alert on new comments and reviews on pull requests you care about.
+
+Polls GitHub's notifications API, collects the comments and reviews added to the
+matching threads, and posts them to a Slack incoming webhook.  Authenticates by
+shelling out to `gh`, so it carries no token of its own.
+
+Scopes: "mine" (you opened it), "mentions" (adds threads that name you), and
+"involved" (adds review requests and assignments).
+"""
+
+import argparse
+import json
+import os
+import re
+import subprocess
+import sys
+import time
+import urllib.error
+import urllib.request
+from datetime import datetime, timedelta, timezone
+
+STATE_PATH = os.path.expanduser("~/.local/state/github-pr-watch/state.json")
+WEBHOOK_PATH = os.path.expanduser("~/.config/github-pr-watch/webhook")
+WEBHOOK_ENV = "GITHUB_PR_WATCH_SLACK_WEBHOOK"
+
+
+def gh_api(path):
+    out = subprocess.run(
+        ["gh", "api", "-H", "Accept: application/vnd.github+json", path],
+        capture_output=True, text=True, check=True,
+    ).stdout
+    return json.loads(out)
+
+
+def read_webhook():
+    try:
+        with open(WEBHOOK_PATH) as f:
+            return f.read().strip()
+    except FileNotFoundError:
+        return None
+
+
+def load_state():
+    try:
+        with open(STATE_PATH) as f:
+            return json.load(f)
+    except (FileNotFoundError, json.JSONDecodeError):
+        return {"seen": {}}
+
+
+def save_state(state):
+    os.makedirs(os.path.dirname(STATE_PATH), exist_ok=True)
+    tmp = STATE_PATH + ".tmp"
+    with open(tmp, "w") as f:
+        json.dump(state, f, indent=2)
+    os.replace(tmp, STATE_PATH)
+
+
+def me():
+    return gh_api("/user")["login"]
+
+
+# A thread carries exactly one reason, and "mention" outranks "author": being
+# named in a comment on your own pull request hides it behind reason "mention".
+# So anything that could sit on your own thread is confirmed against its author.
+OWN_THREAD_REASONS = {"mention", "comment", "state_change", "subscribed", "manual"}
+MENTION_REASONS = {"mention", "team_mention"}
+INVOLVED_REASONS = MENTION_REASONS | {"review_requested", "assign", "comment"}
+
+
+def subject_ref(thread):
+    """(owner/repo, number) for a notification thread."""
+    return thread["repository"]["full_name"], thread["subject"]["url"].rsplit("/", 1)[-1]
+
+
+def opened_by(thread, login, cache):
+    """Whether this user opened the pull request or issue behind the thread."""
+    repo, number = subject_ref(thread)
+    key = f"{repo}#{number}"
+    if key not in cache:
+        kind = "pulls" if thread["subject"]["type"] == "PullRequest" else "issues"
+        try:
+            cache[key] = gh_api(f"/repos/{repo}/{kind}/{number}")["user"]["login"]
+        except (subprocess.CalledProcessError, KeyError):
+            cache[key] = ""
+    return cache[key] == login
+
+
+def relevant_threads(since, scope, login, cache):
+    """Notification threads worth alerting on, per the chosen scope."""
+    path = f"/notifications?all=true&since={since}&per_page=100"
+    keep = []
+    for t in gh_api(path):
+        reason = t.get("reason")
+        kind = t["subject"].get("type")
+        if kind not in ("PullRequest", "Issue"):
+            continue
+
+        mine = reason == "author" or (
+            reason in OWN_THREAD_REASONS and opened_by(t, login, cache)
+        )
+        if scope == "mine":
+            # Issues you opened are out of scope; this watches pull requests.
+            if mine and kind == "PullRequest":
+                keep.append(t)
+        elif scope == "mentions":
+            if mine or reason in MENTION_REASONS:
+                keep.append(t)
+        elif reason == "author" or mine or reason in INVOLVED_REASONS:
+            keep.append(t)
+    return keep
+
+
+def new_comments(thread, since):
+    """Comments and reviews added to the PR since the given timestamp.
+
+    The notification thread itself does not carry them: its latest_comment_url
+    is often null, or points at the pull request rather than a comment.
+    """
+    repo, number = subject_ref(thread)
+    is_pr = thread["subject"]["type"] == "PullRequest"
+    found = []
+
+    sources = [("ic", f"/repos/{repo}/issues/{number}/comments?since={since}&per_page=100")]
+    if is_pr:
+        sources.append(
+            ("rc", f"/repos/{repo}/pulls/{number}/comments?since={since}&per_page=100")
+        )
+    for kind, path in sources:
+        for c in gh_api(path):
+            where = ""
+            if c.get("path"):
+                line = c.get("line") or c.get("original_line")
+                where = c["path"] + (f":{line}" if line else "")
+            found.append({
+                "key": f"{kind}:{c['id']}",
+                "author": c["user"]["login"],
+                "body": (c.get("body") or "").strip(),
+                "url": c["html_url"],
+                "kind": "commented on",
+                "where": where,
+                "state": "",
+            })
+
+    for r in [] if not is_pr else gh_api(f"/repos/{repo}/pulls/{number}/reviews?per_page=100"):
+        submitted = r.get("submitted_at") or ""
+        state = r.get("state", "")
+        body = (r.get("body") or "").strip()
+        # An inline-comment review carries no text of its own; its comments
+        # arrive separately as review comments.
+        if submitted <= since or (state == "COMMENTED" and not body):
+            continue
+        found.append({
+            "key": f"rv:{r['id']}",
+            "author": r["user"]["login"],
+            "body": body,
+            "url": r["html_url"],
+            "kind": {
+                "APPROVED": "approved",
+                "CHANGES_REQUESTED": "requested changes on",
+            }.get(state, "reviewed"),
+            "where": "",
+            "state": state,
+        })
+
+    return found
+
+
+BAR = {
+    "APPROVED": "#1f6b45",
+    "CHANGES_REQUESTED": "#9c2b20",
+}
+BAR_DEFAULT = "#e0aa4c"
+BODY_LIMIT = 1400
+
+
+def to_mrkdwn(text):
+    """GitHub Markdown rendered as Slack mrkdwn.
+
+    Slack's dialect is not GitHub's: bold is one asterisk, links are piped
+    inside angle brackets, and a language tag on a fence shows up as code.
+    """
+    text = re.sub(r"<!--.*?-->", "", text, flags=re.S)
+
+    out, in_fence = [], False
+    for line in text.splitlines():
+        if line.lstrip().startswith("```"):
+            in_fence = not in_fence
+            out.append("```")          # a language tag would render as content
+            continue
+        out.append(line if in_fence else inline_mrkdwn(line))
+    if in_fence:
+        out.append("```")
+    return "\n".join(out).strip()
+
+
+def inline_mrkdwn(line):
+    # Slack needs & and < escaped; > is left alone so quoted replies still
+    # render as quotes rather than as literal text.
+    line = line.replace("&", "&amp;").replace("<", "&lt;")
+
+    spans = []
+
+    def stash(m):
+        spans.append(m.group(0))
+        return f"\x00{len(spans) - 1}\x00"
+
+    line = re.sub(r"`[^`]+`", stash, line)          # inline code is literal
+    line = re.sub(r"^\s*#{1,6}\s+(.*)$", r"*\1*", line)   # headings -> bold
+    line = re.sub(r"!\[([^\]]*)\]\(([^)]+)\)", r"<\2|\1 (image)>", line)
+    line = re.sub(r"\[([^\]]+)\]\(([^)]+)\)", r"<\2|\1>", line)
+    line = re.sub(r"\*\*([^*]+)\*\*", r"*\1*", line)
+    line = re.sub(r"__([^_]+)__", r"*\1*", line)
+    line = re.sub(r"^(\s*)[-*+]\s+", r"\1• ", line)
+    return re.sub(r"\x00(\d+)\x00", lambda m: spans[int(m.group(1))], line)
+
+
+def clip(body, url):
+    """Trim to BODY_LIMIT on a line boundary, never inside a code fence."""
+    if len(body) <= BODY_LIMIT:
+        return body
+    cut = body[:BODY_LIMIT]
+    cut = cut[:cut.rfind("\n")] if "\n" in cut else cut
+    if cut.count("```") % 2:
+        cut += "\n```"
+    return cut + f"\n<{url}|Read the rest on GitHub>"
+
+
+def build_payload(thread, comment):
+    repo, number = subject_ref(thread)
+    head = (
+        f"*{comment['author']}* {comment['kind']} "
+        f"<{comment['url']}|{repo}#{number}>\n"
+        f"_{thread['subject']['title']}_"
+    )
+    blocks = [{"type": "section", "text": {"type": "mrkdwn", "text": head}}]
+
+    body = to_mrkdwn(comment["body"])
+    if body:
+        blocks.append({
+            "type": "section",
+            "text": {"type": "mrkdwn", "text": clip(body, comment["url"])},
+        })
+    if comment.get("where"):
+        blocks.append({
+            "type": "context",
+            "elements": [{"type": "mrkdwn", "text": f"`{comment['where']}`"}],
+        })
+
+    return {
+        "attachments": [{
+            "color": BAR.get(comment.get("state"), BAR_DEFAULT),
+            "blocks": blocks,
+            "fallback": f"{comment['author']} {comment['kind']} {repo}#{number}",
+        }]
+    }
+
+
+def render_plain(payload):
+    """The dry-run view: what the message says, without Slack's chrome."""
+    lines = []
+    for block in payload["attachments"][0]["blocks"]:
+        if block["type"] == "section":
+            lines.append(block["text"]["text"])
+        else:
+            lines.append(block["elements"][0]["text"])
+    return "\n".join(lines)
+
+
+def post_to_slack(webhook, payload):
+    data = json.dumps(payload).encode()
+    req = urllib.request.Request(
+        webhook, data=data, headers={"Content-Type": "application/json"}
+    )
+    with urllib.request.urlopen(req, timeout=15) as resp:
+        return resp.status
+
+
+def poll(args, state, login, webhook):
+    if args.backfill is not None:
+        since = (datetime.now(timezone.utc) - timedelta(days=args.backfill)).strftime(
+            "%Y-%m-%dT%H:%M:%SZ"
+        )
+    else:
+        since = state.get(
+            "since",
+            (datetime.now(timezone.utc) - timedelta(days=1)).strftime(
+                "%Y-%m-%dT%H:%M:%SZ"
+            ),
+        )
+    started = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    cache = state.setdefault("openers", {})
+    threads = relevant_threads(since, args.scope, login, cache)
+    seen = state["seen"]
+    sent = 0
+
+    for thread in threads:
+        for comment in new_comments(thread, since):
+            if comment["key"] in seen or comment["author"] == login:
+                continue
+            if not args.include_bots and comment["author"].endswith("[bot]"):
+                continue
+            seen[comment["key"]] = started
+            payload = build_payload(thread, comment)
+            if args.dry_run:
+                print(render_plain(payload) + "\n" + "-" * 60)
+            else:
+                post_to_slack(webhook, payload)
+            sent += 1
+
+    state["since"] = started
+    if len(cache) > 500:
+        state["openers"] = dict(list(cache.items())[-500:])
+    if len(seen) > 1000:
+        state["seen"] = dict(sorted(seen.items(), key=lambda kv: kv[1])[-1000:])
+    if not args.dry_run:
+        save_state(state)
+    return len(threads), sent
+
+
+def main():
+    p = argparse.ArgumentParser(description=__doc__)
+    p.add_argument("--dry-run", action="store_true",
+                   help="print to stdout and leave state untouched")
+    p.add_argument("--backfill", type=int, metavar="DAYS",
+                   help="look back this many days, overriding saved state\n(default: since the last poll, or 1 day on a first run)")
+    p.add_argument("--scope", choices=("mine", "mentions", "involved"),
+                   default="mine",
+                   help="mine: PRs you opened (default); mentions: adds threads\nthat name you; involved: adds review requests and assignments")
+    p.add_argument("--include-bots", action="store_true",
+                   help="also alert on comments from bot accounts")
+    p.add_argument("--interval", type=int, metavar="SECONDS",
+                   help="poll forever at this interval instead of exiting")
+    args = p.parse_args()
+
+    webhook = os.environ.get(WEBHOOK_ENV) or read_webhook()
+    if not webhook and not args.dry_run:
+        sys.exit(f"no webhook in {WEBHOOK_ENV} or {WEBHOOK_PATH}")
+
+    login = me()
+    while True:
+        state = load_state()
+        try:
+            scanned, sent = poll(args, state, login, webhook)
+            print(f"{scanned} authored thread(s), {sent} alert(s)", file=sys.stderr)
+        except subprocess.CalledProcessError as e:
+            print(f"gh failed: {e.stderr.strip()}", file=sys.stderr)
+        except urllib.error.URLError as e:
+            print(f"slack post failed: {e}", file=sys.stderr)
+        if not args.interval:
+            return
+        time.sleep(args.interval)
+
+
+if __name__ == "__main__":
+    main()

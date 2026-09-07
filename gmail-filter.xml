@@ -1,0 +1,24 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<feed xmlns='http://www.w3.org/2005/Atom' xmlns:apps='http://schemas.google.com/apps/2006'>
+  <title>Mail Filters</title>
+  <id>tag:mail.google.com,2008:filters:github-author-to-slack</id>
+  <updated>2026-09-01T00:00:00Z</updated>
+  <author>
+    <name>udi</name>
+    <email>udi.benamitai@treeverse.io</email>
+  </author>
+  <entry>
+    <category term='filter'></category>
+    <title>Mail Filter</title>
+    <id>tag:mail.google.com,2008:filter:github-author-to-slack</id>
+    <updated>2026-09-01T00:00:00Z</updated>
+    <content></content>
+    <apps:property name='from' value='notifications@github.com'/>
+    <apps:property name='hasTheWord' value='cc:author@noreply.github.com -cc:your_activity@noreply.github.com'/>
+    <apps:property name='label' value='GitHub/my-prs'/>
+    <apps:property name='forwardTo' value='SLACK_CHANNEL_EMAIL_HERE'/>
+    <apps:property name='shouldNeverSpam' value='true'/>
+    <apps:property name='sizeOperator' value='s_sl'/>
+    <apps:property name='sizeUnit' value='s_smb'/>
+  </entry>
+</feed>
