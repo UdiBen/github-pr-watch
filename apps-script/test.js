@@ -57,10 +57,10 @@ for (const f of fixtures) {
 
 // The CC filter must accept every reason that can land on your own thread,
 // and reject the firehose ones.
-for (const cc of ['author', 'mention', 'state_change', 'comment', 'manual']) {
+for (const cc of ['author', 'mention', 'state_change', 'comment', 'manual', 'assign']) {
   check('accepts ' + cc, lib.ACCEPT_CC.test(cc + '@noreply.github.com'));
 }
-for (const cc of ['review_requested', 'team_mention', 'assign', 'ci_activity']) {
+for (const cc of ['review_requested', 'team_mention', 'ci_activity', 'your_activity']) {
   check('rejects ' + cc, !lib.ACCEPT_CC.test(cc + '@noreply.github.com'));
 }
 

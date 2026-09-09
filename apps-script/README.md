@@ -23,14 +23,20 @@ version does not have.
 
 ## Two traps, both the same shape as the API's
 
-**The CC address carries one reason, and it is not always the most specific
-one.** A genuine inline comment on a pull request *you opened* arrives CC'd to
-`state_change@` if you ever reopened that pull request, and to `comment@` once
-you have replied in the thread. Filtering on `author@` alone silently drops
-them — the same precedence problem the notifications API has with `mention`
-outranking `author`. So `ACCEPT_CC` admits `author`, `mention`, `state_change`,
-`comment` and `manual`, and deliberately excludes `review_requested`,
-`team_mention`, `assign` and `ci_activity`.
+**The CC address carries one reason, and it is rarely the most specific one.**
+A genuine inline comment on a pull request *you opened* arrives CC'd to
+`state_change@` if you ever reopened it, `comment@` once you have replied in the
+thread, and `assign@` if you assigned the pull request to yourself. Filtering on
+`author@` alone silently drops all three — the same precedence problem the
+notifications API has with `mention` outranking `author`.
+
+`assign@` is the one that bites hardest, because assigning your own pull request
+to yourself is a common convention, and every comment on such a pull request
+then routes around an `author@` filter. Nothing errors; the alerts simply stop.
+
+So `ACCEPT_CC` admits `author`, `mention`, `state_change`, `comment`, `manual`
+and `assign`, and excludes `review_requested`, `team_mention` and `ci_activity`,
+which are the firehose. `push@` and `subscribed@` do not appear in practice.
 
 Anchor that pattern on the address boundary. Unanchored, `mention` also matches
 `team_mention@`, which readmits the exact firehose you excluded.

@@ -23,23 +23,24 @@ var SEEN_CAP = 400;
 var TRIGGER_MINUTES = 5;
 
 /**
- * A notification carries exactly one reason, and it is not always the most
- * specific one: a comment on a pull request you opened arrives CC'd to
- * state_change@ if you ever reopened it, and to comment@ once you have replied
- * in the thread.  Filtering on author@ alone silently drops those.
+ * A notification carries exactly one reason, and it is rarely the most specific
+ * one.  A comment on a pull request you opened arrives CC'd to state_change@ if
+ * you ever reopened it, comment@ once you have replied in the thread, and
+ * assign@ if you assigned the pull request to yourself.  Filtering on author@
+ * alone silently drops all three.
  *
- * review_requested@, team_mention@, assign@ and ci_activity@ are left out on
- * purpose; they are the firehose.
+ * review_requested@, team_mention@ and ci_activity@ stay out; they are the
+ * firehose.  push@ and subscribed@ do not appear in practice.
  */
 // Anchored on the address boundary: an unanchored 'mention' also matches
 // team_mention@, which is exactly the traffic this excludes.
-var ACCEPT_CC = /(?:^|[<\s,])(author|mention|state_change|comment|manual)@noreply\.github\.com/;
+var ACCEPT_CC = /(?:^|[<\s,])(author|mention|state_change|comment|manual|assign)@noreply\.github\.com/;
 var MAX_AGE_DAYS = 2;
 
 var QUERY = 'from:notifications@github.com ' +
   '{cc:author@noreply.github.com cc:mention@noreply.github.com ' +
   'cc:state_change@noreply.github.com cc:comment@noreply.github.com ' +
-  'cc:manual@noreply.github.com} ' +
+  'cc:manual@noreply.github.com cc:assign@noreply.github.com} ' +
   '-cc:your_activity@noreply.github.com newer_than:' + MAX_AGE_DAYS + 'd';
 
 // "Merged #123 into main." and friends are not comments.
